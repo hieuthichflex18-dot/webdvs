@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tool Dự Đoán Tài Xỉu AI v3</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body, html { width: 100%; height: 100%; overflow: hidden; background: #111; font-family: 'Segoe UI', sans-serif; }
+        #game-frame { width: 100%; height: 100%; border: none; position: absolute; top: 0; left: 0; z-index: 1; }
+        .menu-container {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            z-index: 9999;
+        }
+        .hamburger {
+            background: rgba(0,0,0,0.8);
+            border: 1px solid #ff66b2;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 0 10px #ff66b2;
+        }
+        .hamburger div {
+            width: 25px;
+            height: 3px;
+            background: #00ffff;
+            margin: 5px 0;
+            transition: 0.3s;
+        }
+        .menu-dropdown {
+            display: none;
+            position: absolute;
+            top: 50px;
+            right: 0;
+            background: rgba(0,0,0,0.9);
+            border: 1px solid #00ffff;
+            border-radius: 8px;
+            min-width: 150px;
+            overflow: hidden;
+        }
+        .menu-dropdown.active { display: block; }
+        .menu-item {
+            padding: 12px 15px;
+            color: #fff;
+            text-align: center;
+            cursor: pointer;
+            border-bottom: 1px solid #333;
+            font-weight: bold;
+        }
+        .menu-item:hover { background: #00ffff; color: #000; }
+        .menu-item.active { background: #ff66b2; color: #fff; }
+        .gif-container {
+            transition: transform 0.3s ease;
+            position: relative;
+            width: 100%;
+            pointer-events: auto;
+            cursor: grab;
+            touch-action: none;
+            user-select: none;
+            filter: drop-shadow(0 0 10px rgba(0,255,255,0.3));
+        }
+        .gif-container:active { cursor: grabbing; }
+        .gif-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+            pointer-events: none;
+        }
+        .gif-container.rotate-90 { transform: rotate(90deg); }
+        .gif-container.rotate-180 { transform: rotate(180deg); }
+        .gif-container.rotate-270 { transform: rotate(270deg); }
+        #tool-ui {
+            position: fixed;
+            top: 20%;
+            left: 5%;
+            z-index: 9998;
+            pointer-events: none;
+            width: 30vw;
+            min-width: 200px;
+            max-width: 400px;
+            display: flex;
+            justify-content: center;
+        }
+        .overlay-content {
+            position: absolute;
+            top: 28%;
+            left: 43%;
+            width: 52%;
+            height: 55%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 3%;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+        .session-id {
+            color: #ffd700;
+            font-size: clamp(0.5rem, 1.3vw, 0.75rem);
+            font-weight: bold;
+            margin-bottom: 3%;
+            text-shadow: 0 0 5px #ffd700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 95%;
+        }
+        .result-text {
+            font-size: clamp(1.1rem, 2.8vw, 2rem);
+            font-weight: bold;
+            text-transform: uppercase;
+            margin: 3% 0;
+            letter-spacing: 1px;
+            line-height: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 95%;
+        }
+        .result-text.xiu { color: #00ffff; text-shadow: 0 0 8px #00ffff; }
+        .result-text.tai { color: #ff3366; text-shadow: 0 0 8px #ff3366; }
+        .result-text.loading { font-size: clamp(0.65rem, 1.6vw, 0.95rem); color: #fff; animation: blink 1s infinite; }
+        .progress-wrapper {
+            width: 92%;
+            background: rgba(0,0,0,0.5);
+            border-radius: 8px;
+            height: clamp(5px, 1.1vw, 7px);
+            margin-top: 3%;
+            overflow: hidden;
+            border: 1px solid #555;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #00ffff, #0055ff);
+            transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+        }
+        .confidence-text {
+            color: #fff;
+            font-size: clamp(0.5rem, 1.3vw, 0.75rem);
+            margin-top: 3%;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 95%;
+        }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    </style>
+</head>
+<body>
+
+<iframe id="game-frame" src="https://play.lc79.bet/"></iframe>
+
+<div class="menu-container">
+    <div class="hamburger" onclick="toggleMenu()">
+        <div></div><div></div><div></div>
+    </div>
+    <div class="menu-dropdown" id="menuOptions">
+        <div class="menu-item active" id="btn-md5" onclick="switchTable()">BÀN MD5</div>
+        <div class="menu-item" id="btn-rotate" onclick="rotateRobot()" style="border-top:1px solid #555;margin-top:5px;padding-top:12px;">🔄 XOAY ROBOT</div>
+    </div>
+</div>
+
+<div id="tool-ui">
+    <div class="gif-container" id="drag-handle">
+        <img src="https://aibcr.me/images/robot_login.gif" alt="Robot AI">
+        <div class="overlay-content">
+            <div class="session-id" id="session-id">#Đang tải...</div>
+            <div class="result-text loading" id="prediction-result">Đang tính...</div>
+            <div class="progress-wrapper">
+                <div class="progress-bar" id="confidence-bar"></div>
+            </div>
+            <div class="confidence-text" id="confidence-text">Độ tin cậy: 0%</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ===== DRAG & DROP =====
+    const toolUI = document.getElementById('tool-ui');
+    const dragHandle = document.getElementById('drag-handle');
+    let isDragging = false, startX, startY, initialLeft, initialTop;
+
+    function onDragStart(e) {
+        isDragging = true;
+        const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+        const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+        const rect = toolUI.getBoundingClientRect();
+        initialLeft = rect.left;
+        initialTop = rect.top;
+        startX = clientX;
+        startY = clientY;
+    }
+    function onDragMove(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        const clientX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+        const clientY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+        let newLeft = initialLeft + (clientX - startX);
+        let newTop = initialTop + (clientY - startY);
+        const maxX = window.innerWidth - toolUI.offsetWidth;
+        const maxY = window.innerHeight - toolUI.offsetHeight;
+        newLeft = Math.max(0, Math.min(newLeft, maxX));
+        newTop = Math.max(0, Math.min(newTop, maxY));
+        toolUI.style.left = newLeft + 'px';
+        toolUI.style.top = newTop + 'px';
+        toolUI.style.right = 'auto';
+        toolUI.style.bottom = 'auto';
+    }
+    function onDragEnd() { isDragging = false; }
+    dragHandle.addEventListener('mousedown', onDragStart);
+    document.addEventListener('mousemove', onDragMove, { passive: false });
+    document.addEventListener('mouseup', onDragEnd);
+    dragHandle.addEventListener('touchstart', onDragStart, { passive: false });
+    document.addEventListener('touchmove', onDragMove, { passive: false });
+    document.addEventListener('touchend', onDragEnd);
+
+    // ===== ROTATE ROBOT =====
+    let robotRotation = 0;
+    function rotateRobot() {
+        const gifContainer = document.getElementById('drag-handle');
+        robotRotation = (robotRotation + 90) % 360;
+        gifContainer.classList.remove('rotate-90', 'rotate-180', 'rotate-270');
+        if (robotRotation === 90) gifContainer.classList.add('rotate-90');
+        else if (robotRotation === 180) gifContainer.classList.add('rotate-180');
+        else if (robotRotation === 270) gifContainer.classList.add('rotate-270');
+    }
+
+    // ===== MENU =====
+    function toggleMenu() {
+        document.getElementById('menuOptions').classList.toggle('active');
+    }
+    function switchTable() {
+        document.getElementById('btn-md5').classList.add('active');
+        document.getElementById('menuOptions').classList.remove('active');
+        fetchPrediction();
+    }
+
+    // ===== API =====
+    const API_URL = 'https://iloveyou-9oah.onrender.com/api/md5';
+    let lastPhienNay = null;
+
+    async function fetchPrediction() {
+        try {
+            const response = await fetch(API_URL);
+            const data = await response.json();
+
+            if (!data || typeof data !== 'object') return;
+
+            // Lấy dữ liệu từ API
+            const phienNay = data.Phien_nay;
+            let duDoan = data.Du_doan || '';
+            const doTinCay = data.Do_tin_cay || '0%';
+            
+            // CHUẨN HÓA DỰ ĐOÁN - FIX LỖI HIỂN THỊ SAI
+            duDoan = duDoan.toLowerCase().trim();
+            if (duDoan === 'tài' || duDoan === 'tai') {
+                duDoan = 'TÀI';
+            } else if (duDoan === 'xỉu' || duDoan === 'xiu') {
+                duDoan = 'XỈU';
+            } else {
+                duDoan = 'TÀI'; // Mặc định nếu không xác định
+            }
+
+            // Kiểm tra nếu phiên mới khác phiên cũ
+            if (phienNay && String(phienNay) !== String(lastPhienNay)) {
+                lastPhienNay = String(phienNay);
+                
+                // Cập nhật session ID
+                document.getElementById('session-id').innerText = '#' + phienNay;
+                
+                // Cập nhật kết quả dự đoán
+                document.getElementById('prediction-result').innerText = duDoan;
+                document.getElementById('prediction-result').className = 'result-text ' + (duDoan === 'TÀI' ? 'tai' : 'xiu');
+                
+                // Cập nhật thanh độ tin cậy
+                const confidenceValue = parseInt(doTinCay);
+                const barWidth = isNaN(confidenceValue) ? 65 : Math.min(confidenceValue, 100);
+                document.getElementById('confidence-bar').style.width = barWidth + '%';
+                document.getElementById('confidence-text').innerText = 'Độ tin cậy: ' + doTinCay;
+            }
+        } catch (error) {
+            console.error('API error:', error);
+        }
+    }
+
+    // ===== AUTO FETCH EVERY 5 SECONDS =====
+    setInterval(fetchPrediction, 5000);
+    fetchPrediction();
+
+    // ===== REMOVE OLD ANTIDEBUG SCRIPTS =====
+    window.performance.now = function() { return 0; };
+    console.log = function() {};
+    console.clear = function() {};
+    console.error = function() {};
+    console.warn = function() {};
+    console.info = function() {};
+    console.debug = function() {};
+    console.trace = function() {};
+    console.dir = function() {};
+    console.table = function() {};
+    console.group = function() {};
+    console.groupEnd = function() {};
+    console.count = function() {};
+    console.assert = function() {};
+    console.time = function() {};
+    console.timeEnd = function() {};
+    
+    const originalSetInterval = window.setInterval;
+    window.setInterval = function(fn, delay) {
+        if (delay < 2000) return;
+        return originalSetInterval(fn, delay);
+    };
+    const intervals = [];
+    const oldSetInterval = window.setInterval;
+    window.setInterval = function(fn, delay) {
+        if (delay < 2000) return 0;
+        const id = oldSetInterval(fn, delay);
+        intervals.push(id);
+        return id;
+    };
+    setTimeout(() => {
+        intervals.forEach(id => clearInterval(id));
+        window.setInterval = oldSetInterval;
+    }, 1000);
+</script>
+
+</body>
+</html>
